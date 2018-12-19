@@ -287,11 +287,12 @@ func (p *MediaPlaylist) Remove() (err error) {
 
 // Append general chunk to the tail of chunk slice for a media playlist.
 // This operation does reset playlist cache.
-func (p *MediaPlaylist) Append(uri string, duration float64, title string) error {
+func (p *MediaPlaylist) Append(uri string, duration float64, title string, meta *map[string]string) error {
 	seg := new(MediaSegment)
 	seg.URI = uri
 	seg.Duration = duration
 	seg.Title = title
+	seg.Meta = meta
 	return p.AppendSegment(seg)
 }
 
@@ -320,7 +321,7 @@ func (p *MediaPlaylist) Slide(uri string, duration float64, title string) {
 	} else if !p.Closed {
 		p.SeqNo++
 	}
-	p.Append(uri, duration, title)
+	p.Append(uri, duration, title, nil)
 }
 
 // Reset playlist cache. Next called Encode() will regenerate playlist from the chunk slice.
@@ -589,6 +590,16 @@ func (p *MediaPlaylist) Encode() *bytes.Buffer {
 			}
 			p.buf.WriteString(durationCache[seg.Duration])
 		}
+		if seg.Meta != nil {
+			for k,v := range *seg.Meta {
+				p.buf.WriteByte(' ');
+				p.buf.WriteString(k)
+				p.buf.WriteString(`="`)
+				p.buf.WriteString(v)
+				p.buf.WriteByte('"')
+			}
+		}
+
 		p.buf.WriteRune(',')
 		p.buf.WriteString(seg.Title)
 		p.buf.WriteRune('\n')

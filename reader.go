@@ -179,7 +179,6 @@ func decode(buf *bytes.Buffer, strict bool) (Playlist, ListType, error) {
 		if strict && err != nil {
 			return media, state.listType, err
 		}
-
 	}
 	if state.listType == MEDIA && state.tagWV {
 		media.WV = wv
@@ -364,7 +363,18 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 			sepIndex = len(line)
 		}
 		duration := line[8:sepIndex]
+		state.meta = nil
+
 		if len(duration) > 0 {
+			spIndex := strings.IndexByte(duration, ' ')
+			if spIndex > 0 {
+				tags := duration[spIndex+1:]
+				metaTags := decodeParamsLine(tags)
+				if len(metaTags) > 0 {
+					state.meta = &metaTags
+				}
+				duration = duration[:spIndex]
+			}
 			if state.duration, err = strconv.ParseFloat(duration, 64); strict && err != nil {
 				return fmt.Errorf("Duration parsing error: %s", err)
 			}
@@ -374,7 +384,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		}
 	case !strings.HasPrefix(line, "#"):
 		if state.tagInf {
-			err := p.Append(line, state.duration, state.title)
+			err := p.Append(line, state.duration, state.title, state.meta)
 			if err == ErrPlaylistFull {
 				// Extend playlist by doubling size, reset internal state, try again.
 				// If the second Append fails, the if err block will handle it.
@@ -383,7 +393,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 				p.Segments = append(p.Segments, make([]*MediaSegment, p.Count())...)
 				p.capacity = uint(len(p.Segments))
 				p.tail = p.count
-				err = p.Append(line, state.duration, state.title)
+				err = p.Append(line, state.duration, state.title, state.meta)
 			}
 			// Check err for first or subsequent Append()
 			if err != nil {
